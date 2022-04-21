@@ -1,11 +1,9 @@
 from LapSRN import LapSRN
 import tensorflow as tf
 import numpy as np
-from utils import display_images
-import os
-import cv2
-import matplotlib.pyplot as plt
 from tqdm import tqdm
+import argparse
+import cv2
 
 def run_test(scale, weights_path, test_lr, test_hr):
     """
@@ -32,43 +30,36 @@ def run_test(scale, weights_path, test_lr, test_hr):
     return np.mean(psnrs)
 
 
-def demo(scale, weights_path, img_path):
-    net = LapSRN(scale, depth=10, batch_size=1, learning_rate=1e-3, alpha=0.02)
-    net = net.prepare_model()
-    net.load_weights(weights_path)
+def baseline_test(scale, test_lr, test_hr):
+    """
+    Run a baseline test by upsampling the images using interpolation
+    """
+    psnrs = []
+    for i in tqdm(range(test_lr.shape[0])):
+        im_lr = test_lr[i]
+        im_hr = test_hr[i]
+        bicub = cv2.resize(im_lr, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
+        psnr = tf.image.psnr(np.expand_dims(im_hr, axis=-1), np.expand_dims(bicub, axis=-1), 1)
+        psnrs.append(psnr)
+    return np.mean(psnrs)
 
-    image = cv2.imread(os.path.join(img_path))
-    imfloat = image.astype(np.float32) / 255.0
-    imgYCC_lr = cv2.cvtColor(imfloat, cv2.COLOR_BGR2YCrCb)
-    imgY = imgYCC_lr[:, :, 0]
-    imgY = np.expand_dims(imgY, axis=(0, -1))
-    Y = net.predict(imgY)
-    display_images(np.reshape(imgY, (128, 128)), np.reshape(Y, (128*scale, 128*scale)))
 
-    Y = np.reshape(Y, (Y.shape[1], Y.shape[2], 1))
-    Cr = np.expand_dims(cv2.resize(imgYCC_lr[:, :, 1], None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC), axis=2)
-    Cb = np.expand_dims(cv2.resize(imgYCC_lr[:, :, 2], None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC), axis=2)
+def main(args):
+    test_lr = np.load(args.lr_set)
+    test_hr = np.load(args.hr_set)
+    psnr_baseline = baseline_test(args.scale, test_lr, test_hr)
+    psnr_model = run_test(args.scale, args.weights, test_lr, test_hr)
+    print("Baseline PSNR: {}".format(psnr_baseline))
+    print("Model PSNR: {}".format(psnr_model))
 
-    img_hr = np.concatenate((Y, Cr, Cb), axis=2)
-    img_hr_rgb = ((cv2.cvtColor(img_hr, cv2.COLOR_YCrCb2BGR)) * 255.0).clip(min=0, max=255)
-    img_hr_rgb = (img_hr_rgb).astype(np.uint8)
-
-    bicubic_image = cv2.resize(image, None, fx=scale, fy=scale, interpolation=cv2.INTER_CUBIC)
-
-    fig = plt.figure()
-    fig.add_subplot(1,3,1)
-    plt.imshow(image)
-    plt.axis('off')
-    fig.add_subplot(1,3,2)
-    plt.imshow(img_hr_rgb)
-    plt.axis('off')
-    fig.add_subplot(1,3,3)
-    plt.imshow(bicubic_image)
-    plt.axis('off')
 
 if __name__ == '__main__':
-    test_lr = np.load("dataset/x4/test_lr_x4.npy")[:500]
-    test_hr = np.load("dataset/x4/test_hr_x4.npy")[:500]
-    psnr_x4 = run_test(4, "x4_WEIGHTS.hdf5", test_lr, test_hr)
-    print("PSNR X4: {}".format(psnr_x4))
-    #demo(4, "x4_WEIGHTS.hdf5", "prova.png")
+    # For example, to run tests on the X2 model the command is:
+    # python testing.py --scale 2 --lr_set dataset/x2/test_lr_x2.npy --hr_set dataset/x2/test_hr_x2.npy --weights weights/x2_WEIGHTS.hdf5
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--scale", type=int, help="Upscaling factor")
+    parser.add_argument("--lr_set", type=str, help="Path to the LR test set")
+    parser.add_argument("--hr_set", type=str, help="Path to the HR test set")
+    parser.add_argument("--weights", type=str, help="Path to the model pre-trained weights")
+    args = parser.parse_args()
+    main(args)
