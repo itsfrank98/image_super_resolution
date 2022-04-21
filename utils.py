@@ -12,8 +12,8 @@ from tensorflow.keras.utils import Sequence
 class ReadSequence(Sequence):
     def __init__(self, train_hr_path, train_lr_path, batch_size):
         super().__init__()
-        self.train_hr = np.load(train_hr_path)[:2000]
-        self.train_lr = np.load(train_lr_path)[:2000]
+        self.train_hr = np.load(train_hr_path)
+        self.train_lr = np.load(train_lr_path)
         self.batch_size = batch_size
 
     def __len__(self):
@@ -87,9 +87,11 @@ def display_images(img1, img2):
     """Display two images side by side"""
     fig = plt.figure()
     fig.add_subplot(1,2,1)
+    plt.title("LR patch")
     plt.imshow(img1)
     plt.axis('off')
     fig.add_subplot(1,2,2)
+    plt.title("HR patch")
     plt.imshow(img2)
     plt.axis('off')
 
@@ -99,7 +101,6 @@ def utility_function(source, dst):
     for f in tqdm(sorted(os.listdir(source))):
         l.append(np.load(os.path.join(source, f)))
     np.save(dst + '.npy', np.array(l))
-
 
 def save_set(ls, folder):
     """
@@ -124,6 +125,7 @@ def main(args):
 
 
 if __name__ == "__main__":
+    # python utils.py --lr_img_src raw_dataset/images/lr_x4/test --hr_img_src raw_dataset/images/gt/test --scale 4 --lr_patches_dst raw_dataset/patches/lr_x4/test --hr_patches_dst raw_dataset/patches/gt/x4/test
     parser = argparse.ArgumentParser()
     parser.add_argument("--lr_img_src", help="Path to the folder containing the low resolution images", required=True, type=str)
     parser.add_argument("--hr_img_src", help="Path to the folder containing the high resolution images", required=True, type=str)

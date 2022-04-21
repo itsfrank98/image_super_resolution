@@ -2,13 +2,14 @@ import tensorflow as tf
 import math
 import numpy as np
 import itertools
-from VGGLoss import VGGLoss
-from keras.layers import Conv2DTranspose, Conv2D, LeakyReLU, Input, Add
+from keras.layers import Conv2D, LeakyReLU, Input, Add
 from keras.models import Model
 from tensorflow.keras.optimizers import schedules
 
 class LapSRN:
-    def __init__(self, scale, depth, batch_size, learning_rate, alpha, vgg_layer='block5_conv4', input_shape=(128, 128)):
+    tf.random.set_seed(42)
+
+    def __init__(self, scale, depth, batch_size, learning_rate, alpha, input_shape=(128, 128)):
         self.input_shape = input_shape
         self.scale = int(scale)
         self.batch_size = batch_size
@@ -16,7 +17,6 @@ class LapSRN:
         self.num_of_components = int(math.floor(math.log(self.scale, 2)))
         self.learning_rate = learning_rate
         self.alpha = alpha
-        #self.loss = VGGLoss(vgg_layer)
         self.filters=64
 
     def subpixel(self, X: tf.Tensor, upscale_factor):
@@ -56,13 +56,6 @@ class LapSRN:
         layer_fe = LeakyReLU(alpha=self.alpha)(layer_fe)
         return layer_fe
 
-    def deconv_layer_pixel_shuffle(self, input_layer):
-        """Layer used for upsampling the image"""
-        current_scale = 2
-        deconv_layer = Conv2D(filters=self.filters, kernel_size=4, strides=(1, 1), padding='SAME')(input_layer)
-        deconv_layer = tf.nn.depth_to_space(deconv_layer, current_scale)
-        return deconv_layer
-
     def upsample_image(self, input, scale):
         ups = self.subpixel(input, scale)
         ups = LeakyReLU(alpha=self.alpha)(ups)
@@ -100,49 +93,3 @@ class LapSRN:
         model.compile(optimizer=opt, loss=self.L1_Charbonnier_loss, metrics=[self.psnr])
         return model
 
-
-    '''def LapSRN_trainable_model_multi(self, HR_outputs, HR_origs):
-        losses = list()
-        train_ops = list()
-        psnrs = list()
-
-        for n in range(0, len(HR_outputs)):
-            psnr = tf.image.psnr(HR_outputs[n], HR_origs[n], max_val=1.0)
-
-            loss = self.loss.compute_loss(HR_outputs[n], HR_origs[n])
-            decayed_lr = tf.keras.optimizers.schedule.ExponentialDecay(self.learning_rate, 10000, 0.95, staircase=True)
-            # decayed_lr = tf.train.exponential_decay(self.learning_rate, self.global_step, 10000, 0.95, staircase=True)
-            train_op = tf.keras.optimizers.Adam(learning_rate=decayed_lr).minimize(loss)
-
-            losses.append(loss)
-            train_ops.append(train_op)
-            psnrs.append(psnr)
-
-        return losses, train_ops, psnrs
-
-    def LapSRN_trainable_model(self, HR_out, HR_orig):
-        psnr = tf.image.psnr(HR_out, HR_orig, max_val=1.0)
-
-        loss = self.loss.compute_loss(HR_out, HR_orig)
-        decay_schedule = tf.keras.optimizers.schedule.ExponentialDecay(self.learning_rate, 10000, 0.95, staircase=True)
-        # decayed_lr = tf.train.exponential_decay(self.learning_rate, self.global_step, 10000, 0.95, staircase=True)
-        optimizer = tf.keras.optimizers.Adam(learning_rate=decay_schedule)
-
-        return loss, train_op, psnr'''
-
-'''
-from LapSRN import LapSRN
-import numpy as np
-from tensorflow.keras.optimizers import schedules
-import tensorflow as tf
-
-lr_im = "raw_dataset/patches/lr_x2/train/lr_10_0.npy"
-hr_im = "raw_dataset/patches/gt/x2/train/hr_10_0.npy"
-im = np.load(lr_im)
-im_hr = np.load(hr_im)
-c = LapSRN(scale=2, depth=10, learning_rate=1e-4, batch_size=1, alpha=0.02)
-m = c.prepare_model()
-im = np.expand_dims(im, axis=(0, -1))
-im_hr = np.expand_dims(im_hr, axis=(0, -1))
-m.fit(im, im_hr, batch_size=1, epochs=1)
-'''
