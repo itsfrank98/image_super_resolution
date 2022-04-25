@@ -5,7 +5,7 @@ Subpixel convolution is used as upsampling technique.
 Python 3.9
 
 To run the project:
-* install the dependencies by running ```pip install --requirements.txt```
+* install the dependencies by running ```pip install -r requirements.txt```
 * preprocess the images (more info in the file ```utils.py```). Preprocessing consists in:
   * scaling the images to the 0-1 range
   * converting the images from RGB to YCbCr and considering only the Y channel (common practice)
